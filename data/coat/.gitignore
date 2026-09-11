@@ -1,0 +1,4 @@
+# Keep the Coat dataset local; only documentation and this ignore file are tracked.
+*
+!.gitignore
+!README.md

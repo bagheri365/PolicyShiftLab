@@ -1,0 +1,4 @@
+# Keep Yahoo! R3 data local.
+*
+!.gitignore
+!README.md

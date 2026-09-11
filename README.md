@@ -255,7 +255,7 @@ IPW curves.
 <p align="center">
   <img src="figures/target_logged_ipw_reliability.png"
        alt="Target, logged, and oracle-IPW reliability curves"
-       width="650">
+       width="500">
 </p>
 
 Expected calibration error (ECE) is treated as a **descriptive secondary

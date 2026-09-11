@@ -37,16 +37,6 @@ propensity-weighted model training.
 | Coat | Held-out logged vs randomized | Any-reversal rate `53.0%` naive, `40.0%` estimated HT/SNIPS |
 | Yahoo! R3 | Held-out logged vs randomized | Any-reversal rate `100%`; exact-order recovery `0%` across 200 splits |
 
-## Fast reading path
-
-If you only have a minute, read **TL;DR** and **Key results at a glance**.
-
-If you want the empirical evidence, jump to **Coat empirical benchmark** and
-**Yahoo! R3 empirical replication**.
-
-If you want the assumptions, read **Identification regime** and
-**What this project does not claim**.
-
 ## Identification regime
 
 The main synthetic benchmark studies selective observation / covariate shift
@@ -262,7 +252,11 @@ Reliability diagrams use one set of score bins derived from the target
 prediction distribution and reuse those same intervals for target, logged, and
 IPW curves.
 
-![Target, logged, and oracle-IPW reliability curves](figures/target_logged_ipw_reliability.png)
+<p align="center">
+  <img src="figures/target_logged_ipw_reliability.png"
+       alt="Target, logged, and oracle-IPW reliability curves"
+       width="650">
+</p>
 
 Expected calibration error (ECE) is treated as a **descriptive secondary
 diagnostic** because it depends on binning and can be noisy under inverse

@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from policyshiftlab.calibration import (
+    bootstrap_calibration_bands,
     calibration_bins,
     expected_calibration_error,
     quantile_bin_edges,
@@ -127,3 +128,80 @@ def test_shared_edges_cover_zero_and_one() -> None:
 
     assert edges[0] == pytest.approx(0.0)
     assert edges[-1] == pytest.approx(1.0)
+
+
+def test_bootstrap_bands_have_expected_shape_and_order() -> None:
+    rng = np.random.default_rng(4)
+    p = np.linspace(0.01, 0.99, 400)
+    y = rng.binomial(1, p)
+    edges = quantile_bin_edges(p, n_bins=5)
+
+    bands = bootstrap_calibration_bands(
+        y,
+        p,
+        bin_edges=edges,
+        n_bootstrap=100,
+        seed=5,
+    )
+
+    assert bands.lower.shape == (5,)
+    assert bands.upper.shape == (5,)
+    assert np.all(bands.lower <= bands.upper)
+    assert np.all(
+        (bands.fraction_positive >= 0.0)
+        & (bands.fraction_positive <= 1.0)
+    )
+
+
+def test_weighted_bootstrap_is_reproducible() -> None:
+    rng = np.random.default_rng(8)
+    p = np.linspace(0.01, 0.99, 300)
+    y = rng.binomial(1, p)
+    w = np.linspace(0.5, 3.0, 300)
+    edges = quantile_bin_edges(p, n_bins=5)
+
+    first = bootstrap_calibration_bands(
+        y,
+        p,
+        sample_weight=w,
+        bin_edges=edges,
+        n_bootstrap=80,
+        seed=10,
+    )
+    second = bootstrap_calibration_bands(
+        y,
+        p,
+        sample_weight=w,
+        bin_edges=edges,
+        n_bootstrap=80,
+        seed=10,
+    )
+
+    np.testing.assert_allclose(first.lower, second.lower)
+    np.testing.assert_allclose(first.upper, second.upper)
+
+
+@pytest.mark.parametrize(
+    ("n_bootstrap", "confidence_level"),
+    [
+        (1, 0.95),
+        (10, 0.0),
+        (10, 1.0),
+    ],
+)
+def test_invalid_bootstrap_configuration_is_rejected(
+    n_bootstrap,
+    confidence_level,
+) -> None:
+    y = np.array([0, 0, 1, 1], dtype=float)
+    p = np.array([0.1, 0.2, 0.8, 0.9], dtype=float)
+    edges = np.array([0.0, 0.5, 1.0])
+
+    with pytest.raises(ValueError):
+        bootstrap_calibration_bands(
+            y,
+            p,
+            bin_edges=edges,
+            n_bootstrap=n_bootstrap,
+            confidence_level=confidence_level,
+        )

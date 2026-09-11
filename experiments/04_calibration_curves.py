@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from policyshiftlab.calibration import (
+    bootstrap_calibration_bands,
     calibration_bins,
     expected_calibration_error,
     quantile_bin_edges,
@@ -68,6 +69,29 @@ def main() -> None:
         bin_edges=edges,
     )
 
+    target_band = bootstrap_calibration_bands(
+        y,
+        p,
+        bin_edges=edges,
+        n_bootstrap=300,
+        seed=101,
+    )
+    logged_band = bootstrap_calibration_bands(
+        y[selected],
+        p[selected],
+        bin_edges=edges,
+        n_bootstrap=300,
+        seed=102,
+    )
+    ipw_band = bootstrap_calibration_bands(
+        y[selected],
+        p[selected],
+        sample_weight=ipw,
+        bin_edges=edges,
+        n_bootstrap=300,
+        seed=103,
+    )
+
     figure_dir = Path("figures")
     figure_dir.mkdir(exist_ok=True)
     output_path = figure_dir / "target_logged_ipw_reliability.png"
@@ -80,17 +104,35 @@ def main() -> None:
         marker="o",
         label=f"Target (ECE={target_ece:.3f})",
     )
+    plt.fill_between(
+        target_band.mean_predicted,
+        target_band.lower,
+        target_band.upper,
+        alpha=0.12,
+    )
     plt.plot(
         logged_bins.mean_predicted,
         logged_bins.fraction_positive,
         marker="o",
         label=f"Logged (ECE={logged_ece:.3f})",
     )
+    plt.fill_between(
+        logged_band.mean_predicted,
+        logged_band.lower,
+        logged_band.upper,
+        alpha=0.12,
+    )
     plt.plot(
         ipw_bins.mean_predicted,
         ipw_bins.fraction_positive,
         marker="o",
         label=f"Oracle IPW (ECE={ipw_ece:.3f})",
+    )
+    plt.fill_between(
+        ipw_band.mean_predicted,
+        ipw_band.lower,
+        ipw_band.upper,
+        alpha=0.12,
     )
     plt.xlabel("Mean predicted probability")
     plt.ylabel("Observed positive rate")
@@ -105,6 +147,7 @@ def main() -> None:
     print(f"target ECE: {target_ece:.6f}")
     print(f"logged ECE: {logged_ece:.6f}")
     print(f"oracle IPW ECE: {ipw_ece:.6f}")
+    print("bands: pointwise 95% percentile bootstrap intervals")
     print(
         "logged raw count range: "
         f"{logged_bins.bin_count.min()}-{logged_bins.bin_count.max()}"

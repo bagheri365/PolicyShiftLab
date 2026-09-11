@@ -170,3 +170,97 @@ def expected_calibration_error(
     gaps = np.abs(bins.fraction_positive - bins.mean_predicted)
 
     return float(np.sum((bins.bin_weight / total_weight) * gaps))
+
+
+@dataclass(frozen=True)
+class BootstrapCalibrationBands:
+    """Pointwise percentile bootstrap bands for a reliability curve."""
+
+    mean_predicted: np.ndarray
+    fraction_positive: np.ndarray
+    lower: np.ndarray
+    upper: np.ndarray
+    n_bootstrap: int
+
+
+def bootstrap_calibration_bands(
+    y_true: np.ndarray,
+    y_prob: np.ndarray,
+    *,
+    bin_edges: np.ndarray,
+    sample_weight: np.ndarray | None = None,
+    n_bootstrap: int = 500,
+    confidence_level: float = 0.95,
+    seed: int = 0,
+) -> BootstrapCalibrationBands:
+    """Return pointwise bootstrap bands using fixed score bins.
+
+    Rows are resampled with replacement. When ``sample_weight`` is supplied,
+    each resampled row carries its original weight. The resulting weighted
+    within-bin positive rates are ratio estimators.
+
+    These are pointwise percentile bands. They are descriptive uncertainty
+    summaries, not simultaneous confidence bands and not a formal test of
+    differences between calibration curves.
+    """
+    y = np.asarray(y_true, dtype=float)
+    p = np.asarray(y_prob, dtype=float)
+    edges = np.asarray(bin_edges, dtype=float)
+
+    if y.ndim != 1 or p.ndim != 1 or y.shape != p.shape:
+        raise ValueError("y_true and y_prob must be matching 1D arrays")
+    if y.size == 0:
+        raise ValueError("inputs must be non-empty")
+    if n_bootstrap < 2:
+        raise ValueError("n_bootstrap must be at least 2")
+    if not 0.0 < confidence_level < 1.0:
+        raise ValueError("confidence_level must lie in (0, 1)")
+
+    if sample_weight is None:
+        w = None
+    else:
+        w = np.asarray(sample_weight, dtype=float)
+        if w.ndim != 1 or w.shape != y.shape:
+            raise ValueError("sample_weight must match y_true shape")
+
+    point = calibration_bins(
+        y,
+        p,
+        sample_weight=w,
+        bin_edges=edges,
+    )
+    n_expected_bins = edges.size - 1
+    if point.fraction_positive.size != n_expected_bins:
+        raise ValueError(
+            "every fixed bin must contain positive mass in the original sample"
+        )
+
+    rng = np.random.default_rng(seed)
+    draws = np.full((n_bootstrap, n_expected_bins), np.nan, dtype=float)
+
+    for bootstrap_index in range(n_bootstrap):
+        indices = rng.integers(0, y.size, size=y.size)
+        boot_w = None if w is None else w[indices]
+        boot = calibration_bins(
+            y[indices],
+            p[indices],
+            sample_weight=boot_w,
+            bin_edges=edges,
+        )
+
+        # With reasonably populated fixed bins, all bins should survive.
+        # If a rare bootstrap sample empties a bin, leave that draw as NaN.
+        if boot.fraction_positive.size == n_expected_bins:
+            draws[bootstrap_index] = boot.fraction_positive
+
+    alpha = 1.0 - confidence_level
+    lower = np.nanquantile(draws, alpha / 2.0, axis=0)
+    upper = np.nanquantile(draws, 1.0 - alpha / 2.0, axis=0)
+
+    return BootstrapCalibrationBands(
+        mean_predicted=point.mean_predicted,
+        fraction_positive=point.fraction_positive,
+        lower=lower,
+        upper=upper,
+        n_bootstrap=n_bootstrap,
+    )

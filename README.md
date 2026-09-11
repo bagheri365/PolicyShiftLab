@@ -57,6 +57,6 @@ pytest
 
 ## Status
 
-This repository is being built incrementally. The first milestone is a
-reproducible metric and evaluation layer before adding simulation and dataset
-pipelines.
+The metric layer and first synthetic recommender data-generating process are
+implemented. The next milestone is logged-vs-target evaluation using known
+oracle propensities.

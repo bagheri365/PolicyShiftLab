@@ -57,6 +57,22 @@ pytest
 
 ## Status
 
-The metric layer and first synthetic recommender data-generating process are
-implemented. The next milestone is logged-vs-target evaluation using known
-oracle propensities.
+The synthetic recommender and first logged-vs-target Brier evaluation are
+implemented, including naive logged, oracle-IPW, and propensity-stratified
+estimators. The next milestone is Monte Carlo evaluation and uncertainty.
+
+## First experiment
+
+Run:
+
+```bash
+python experiments/01_logged_vs_target.py
+```
+
+The script compares the target-population Brier score with naive logged,
+oracle-IPW, and propensity-stratified estimates using the synthetic recommender.
+
+The oracle-IPW implementation uses the Horvitz-Thompson finite-population mean
+estimator. It is unbiased over repeated selection draws with known inclusion
+probabilities, but it is not guaranteed to have lower error than the naive
+estimator in every finite sample.

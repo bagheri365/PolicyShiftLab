@@ -1,5 +1,11 @@
 """PolicyShiftLab."""
 
+from policyshiftlab.evaluation import (
+    BrierEvaluation,
+    evaluate_brier_under_selection,
+    oracle_ipw_brier_score,
+    propensity_stratified_brier_score,
+)
 from policyshiftlab.metrics import brier_score, effective_sample_size
 from policyshiftlab.synthetic import (
     SyntheticRecommenderData,
@@ -7,6 +13,10 @@ from policyshiftlab.synthetic import (
 )
 
 __all__ = [
+    "BrierEvaluation",
+    "evaluate_brier_under_selection",
+    "oracle_ipw_brier_score",
+    "propensity_stratified_brier_score",
     "brier_score",
     "effective_sample_size",
     "SyntheticRecommenderData",

@@ -50,7 +50,7 @@ higher finite-sample variance and RMSE than naive logged evaluation.
 
 ## What is implemented
 
-The synthetic benchmark currently includes:
+The synthetic benchmark includes:
 
 - a latent-factor recommender outcome model with known target probabilities;
 - aligned and popularity-distorted logging policies;
@@ -66,9 +66,21 @@ The synthetic benchmark currently includes:
 - controlled propensity-misspecification experiments;
 - a hidden-selection failure case where the identifying assumption is violated.
 
+The Coat empirical benchmark adds:
+
+- support and composition auditing before model evaluation;
+- diagnostics for the supplied learned propensity matrix;
+- a baseline logged-vs-randomized comparison;
+- leakage-safe logged fit/evaluation splitting;
+- estimated-propensity HT and SNIPS evaluation;
+- propensity-floor sensitivity analysis;
+- repeated logged holdout splits;
+- model-ranking stability and reversal summaries;
+- user-cluster bootstrap uncertainty on randomized benchmark comparisons.
+
 ## Main synthetic findings
 
-The current experiments illustrate four recurring patterns. Exact values are
+The synthetic experiments illustrate four recurring patterns. Exact values are
 configuration- and seed-specific; the claims are about observed patterns, not
 universal numerical guarantees.
 
@@ -98,6 +110,108 @@ unbiased in the repeated-selection experiment, while weighting with the exact
 observed-only propensity `P(S=1 | X)` retained material bias because
 `Y ⟂ S | X` no longer holds.
 
+## Coat empirical benchmark
+
+Coat provides a biased/self-selected training matrix and a randomized test
+matrix over the same `290` users and `300` items. PolicyShiftLab interprets the
+randomized subset as an evaluation benchmark under Coat's **per-user randomized
+item-assignment design over those users and items**, not as a universal sample
+of every possible recommender deployment population.
+
+The empirical binary outcome is `rating >= 4`. This choice supports
+probability-calibration and Brier-score analysis but discards ordinal rating
+information.
+
+### Support and composition
+
+The support audit finds:
+
+- all `290` users and all `300` items appear in both logged and randomized data;
+- all `4640` randomized observations lie inside logged user/item support;
+- both matrices contain the full rating support `(1, 2, 3, 4, 5)`;
+- logged `P(rating >= 4)` is `0.274`, versus `0.185` in randomized data;
+- every user has `24` logged observations and `16` randomized observations;
+- logged item exposure is more concentrated: item counts range from `5` to
+  `88`, versus `5` to `29` in randomized data.
+
+These differences establish a substantial composition shift while avoiding a
+basic user/item support failure.
+
+### Supplied propensities
+
+`propensities.ascii` contains **learned**, not oracle, propensities. Its mean
+propensity is `0.080019`, close to `24 / 300`, and mean row propensity mass is
+`24.006`. Logged observations occur in higher-propensity regions on average
+(`0.165215`) than logged-unobserved pairs (`0.072610`).
+
+The implied logged inverse weights are variable: the observed weight range is
+about `1.45` to `245.07`, with Kish effective sample size about `2211` from
+`6960` logged ratings. Weighted Coat results are therefore described as
+**estimated-propensity analyses**, not oracle-IPW identification guarantees.
+
+### Leakage-safe evaluation
+
+The primary empirical comparison separates logged model fitting from logged
+evaluation. For each user, one third of logged ratings is held out with a fixed
+random split; the remaining two thirds fit the candidate models. The same
+fitted predictions are then evaluated on the held-out logged subset and the
+randomized Coat benchmark.
+
+Across `200` deterministic logged holdout splits:
+
+| Method | Mean Brier error vs randomized | Mean absolute error | RMSE |
+| --- | ---: | ---: | ---: |
+| Held-out logged naive | `+0.037403` | `0.037403` | `0.037699` |
+| Estimated HT | `+0.018260` | `0.018262` | `0.019142` |
+| Estimated SNIPS | `+0.011893` | `0.011913` | `0.012905` |
+
+Estimated-propensity weighting therefore moves metric levels materially closer
+to randomized evaluation in this benchmark, while leaving non-zero discrepancy.
+
+Model-selection stability improves but is not fully recovered:
+
+| Method | Mean Spearman | Mean Kendall | Any reversal | Exact order recovery |
+| --- | ---: | ---: | ---: | ---: |
+| Held-out logged naive | `0.892` | `0.822` | `0.530` | `0.470` |
+| Estimated HT | `0.919` | `0.865` | `0.400` | `0.600` |
+| Estimated SNIPS | `0.919` | `0.865` | `0.400` | `0.600` |
+
+HT and SNIPS have the same ranking summaries here because self-normalization
+rescales all model scores within a split by the same positive normalization
+constant.
+
+These repeated holdouts quantify **split sensitivity conditional on this
+observed Coat dataset**. They are not independent dataset replications.
+
+### Randomized benchmark uncertainty
+
+For the fixed leakage-safe split with seed `2026`, the numerically top two
+models on randomized evaluation are `user_item_blend` and `user_smoothed`, but
+their difference is negligible:
+
+```text
+Brier(user_item_blend) - Brier(user_smoothed) = -0.000092
+```
+
+A `5000`-replicate paired user-cluster bootstrap gives a percentile interval of
+
+```text
+[-0.002952, +0.002787]
+```
+
+with bootstrap probability `0.521` that `user_item_blend` has lower Brier loss.
+
+Accordingly, the README does not describe either member of this pair as a
+uniquely best model. The interval is a descriptive uncertainty summary, not a
+formal hypothesis test.
+
+### Propensity-floor sensitivity
+
+Propensity floors at `0.01`, `0.02`, and `0.05` are reported only as
+sensitivity analyses. In particular, replacing the supplied propensity with a
+floored value changes the estimator; clipped HT is **not** presented as an
+unbiased estimator of the original target estimand.
+
 ## Calibration diagnostics
 
 Reliability diagrams use one set of score bins derived from the target
@@ -125,15 +239,18 @@ PolicyShiftLab does **not** claim that:
 - propensity correction solves hidden-confounding or unobserved-selection
   problems;
 - a ranking reversal must occur for every policy, dataset, or candidate set;
+- Coat's randomized subset is a universal target population;
+- learned Coat propensities are oracle inclusion probabilities;
 - explicit-rating benchmarks such as Coat or Yahoo! R3 are realistic proxies
   for all modern recommendation products.
 
-The synthetic experiments are designed to expose assumptions and failure modes,
-not to tune the data-generating process until a preferred estimator "wins."
+The experiments are designed to expose assumptions and failure modes, not to
+tune the data-generating process or candidate set until a preferred estimator
+"wins."
 
 ## Experiments
 
-Run the synthetic experiments individually:
+Synthetic experiments:
 
 ```bash
 python experiments/01_logged_vs_target.py
@@ -146,6 +263,22 @@ python experiments/07_overlap_ranking_sweep.py
 python experiments/08_propensity_misspecification.py
 python experiments/09_hidden_selection_failure.py
 ```
+
+Coat experiments:
+
+```bash
+python experiments/10_coat_support_audit.py
+python experiments/11_coat_propensity_audit.py
+python experiments/12_coat_empirical_benchmark.py
+python experiments/13_coat_heldout_benchmark.py
+python experiments/14_coat_repeated_holdouts.py
+python experiments/15_coat_top_pair_bootstrap.py
+```
+
+The baseline experiment `12_coat_empirical_benchmark.py` evaluates on logged
+ratings also used for fitting and is retained as a baseline/mechanics check.
+The leakage-safe experiments `13` through `15` should be used for the stronger
+empirical claims.
 
 ## Development
 
@@ -161,13 +294,10 @@ Run the full test suite:
 pytest
 ```
 
-## Empirical next step
+## Next empirical step
 
-The next phase is a **support and composition audit of the Coat dataset** before
-using its randomized subset as a target-evaluation benchmark. The audit will
-check user/item overlap, user-item support, rating support, activity and item
-popularity, outcome prevalence, missingness, and propensity support.
-
-Only after that audit will the empirical evaluation define precisely what the
-randomized subset approximates and compare logged-data model evaluation against
-that target benchmark. Yahoo! R3 is planned as a replication dataset.
+The next empirical phase is **Yahoo! R3 replication**. The same discipline used
+for Coat applies: first audit support/composition and the meaning of the
+randomized subset, then define the target estimand, then evaluate logged versus
+randomized probability-quality and model-selection stability without tuning the
+candidate set to manufacture reversals.

@@ -1,16 +1,51 @@
 # PolicyShiftLab
 
-PolicyShiftLab is a controlled empirical study of **policy-induced selective
-observation in offline recommender-system evaluation**.
-
-The central question is:
+**Offline recommender evaluation can rank models differently when the logging
+policy determines which labels are observed.**
 
 > When an existing recommendation policy determines which labels are observed,
 > how much can offline probabilistic evaluation and model selection differ from
 > evaluation on the target population?
 
-The project focuses on evaluation rather than propensity-weighted model
-training.
+PolicyShiftLab studies that question with controlled synthetic experiments and
+two explicit-rating benchmarks with randomized evaluation data: **Coat** and
+**Yahoo! R3**. The project focuses on evaluation rather than
+propensity-weighted model training.
+
+## TL;DR
+
+- **Selective observation can change model choice, not just metric level.**
+  Logged-data evaluation can prefer a different model ordering from randomized
+  or target evaluation.
+- **Correction helps only under the right assumptions.** Oracle or estimated
+  propensity weighting can reduce some discrepancies, but finite-sample
+  variance, weak overlap, misspecification, and hidden selection still matter.
+- **Coat:** across 200 leakage-safe logged holdout splits, naive evaluation has
+  at least one ranking reversal in `53.0%` of splits; estimated HT/SNIPS reduce
+  that to `40.0%`.
+- **Yahoo! R3:** across 200 logged holdout splits, the naive logged ranking
+  disagrees with randomized evaluation in **every split**, with exact-order
+  recovery `0.0%`.
+- **The project does not claim IPW always wins.** The strongest message is that
+  identification, overlap, and the evaluation population must be made explicit.
+
+## Key results at a glance
+
+| Setting | Main comparison | Headline result |
+| --- | --- | --- |
+| Synthetic | Logged / oracle-IPW vs target | Naive mean Spearman `0.520`; oracle-IPW `0.932`, but IPW still has reversals in `64.0%` of replications |
+| Coat | Held-out logged vs randomized | Any-reversal rate `53.0%` naive, `40.0%` estimated HT/SNIPS |
+| Yahoo! R3 | Held-out logged vs randomized | Any-reversal rate `100%`; exact-order recovery `0%` across 200 splits |
+
+## Fast reading path
+
+If you only have a minute, read **TL;DR** and **Key results at a glance**.
+
+If you want the empirical evidence, jump to **Coat empirical benchmark** and
+**Yahoo! R3 empirical replication**.
+
+If you want the assumptions, read **Identification regime** and
+**What this project does not claim**.
 
 ## Identification regime
 
@@ -77,6 +112,15 @@ The Coat empirical benchmark adds:
 - repeated logged holdout splits;
 - model-ranking stability and reversal summaries;
 - user-cluster bootstrap uncertainty on randomized benchmark comparisons.
+
+The Yahoo! R3 empirical replication adds:
+
+- support and composition auditing for self-selected and randomized ratings;
+- target alignment to the `5400` randomized-study users;
+- leakage-safe within-user logged fit/evaluation splitting;
+- logged-versus-randomized Brier and model-ranking comparisons;
+- repeated holdout analysis across 200 deterministic splits;
+- user-cluster bootstrap uncertainty for the randomized top pair.
 
 ## Main synthetic findings
 

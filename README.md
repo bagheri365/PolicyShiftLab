@@ -294,10 +294,122 @@ Run the full test suite:
 pytest
 ```
 
-## Next empirical step
+## Yahoo! R3 empirical replication
 
-The next empirical phase is **Yahoo! R3 replication**. The same discipline used
-for Coat applies: first audit support/composition and the meaning of the
-randomized subset, then define the target estimand, then evaluate logged versus
-randomized probability-quality and model-selection stability without tuning the
-candidate set to manufacture reversals.
+Yahoo! R3 contains self-selected ratings and a randomized evaluation subset.
+PolicyShiftLab restricts the logged comparison to the `5400` users who appear
+in randomized evaluation. The randomized benchmark is therefore interpreted as
+evaluation under Yahoo! R3's randomized song-assignment design for those users
+over the same `1000`-item catalog, **not** as a universal target population over
+all `15400` logged users.
+
+As with Coat, the empirical binary event is `rating >= 4`. This supports
+probability-quality and Brier-score comparisons while discarding ordinal rating
+information.
+
+### Support and composition
+
+The support audit finds:
+
+- `311704` logged observations and `54000` randomized observations;
+- `15400` logged users, `5400` randomized users, and all `5400` randomized
+  users present in the logged data;
+- all `1000` items present in both logged and randomized data;
+- all `54000` randomized observations inside logged user/item support;
+- zero exact user-item pair overlap between the two files;
+- full rating support `(1, 2, 3, 4, 5)` in both files;
+- logged `P(rating >= 4)` of `0.401`, versus `0.088` in randomized data;
+- exactly `10` randomized observations per active randomized user;
+- logged item counts ranging from `14` to `5543`, versus `28` to `76` in
+  randomized data.
+
+These diagnostics show a large composition shift without a basic user/item
+support failure for the randomized-user target cohort.
+
+### Leakage-safe evaluation
+
+Within the randomized-user cohort, logged ratings are split within user into a
+fit subset and a held-out evaluation subset. Candidate models are fit only on
+logged-fit ratings; held-out logged ratings and randomized ratings are
+evaluation-only.
+
+For the fixed split with seed `2026`, randomized evaluation ranks
+
+```text
+user_item_blend > item_smoothed > global > user_smoothed
+```
+
+while held-out logged evaluation ranks
+
+```text
+user_smoothed > user_item_blend > item_smoothed > global
+```
+
+For this split, Spearman agreement is `-0.200`, Kendall agreement is `0.000`,
+and there are `3` pairwise reversals.
+
+### Repeated logged holdouts
+
+Across `200` deterministic logged holdout splits (seeds `0` through `199`), the
+held-out logged-versus-randomized Brier discrepancy is:
+
+| Summary | Value |
+| --- | ---: |
+| Mean signed gap | `+0.036354` |
+| Mean absolute gap | `0.038664` |
+| RMSE gap | `0.045996` |
+
+Model-selection disagreement persists across all `200` splits:
+
+| Summary | Value |
+| --- | ---: |
+| Mean / median Spearman | `-0.200 / -0.200` |
+| Mean / median Kendall | `0.000 / 0.000` |
+| Any-reversal rate | `1.000` |
+| Mean reversal count | `3.000` |
+| Exact-order recovery | `0.000` |
+| `user_smoothed` vs `user_item_blend` reversal rate | `1.000` |
+
+These repeated holdouts quantify **split sensitivity conditional on the
+observed Yahoo! R3 dataset**. They are not independent dataset replications.
+
+### Randomized benchmark uncertainty
+
+For the fixed seed-`2026` fit,
+
+```text
+Brier(user_item_blend) - Brier(item_smoothed) = -0.002925
+```
+
+A `5000`-replicate paired user-cluster bootstrap gives the percentile interval
+
+```text
+[-0.004402, -0.001508]
+```
+
+with bootstrap probability `1.000` that `user_item_blend` has lower Brier loss
+in the resampled randomized benchmark. This is a descriptive uncertainty
+summary, not a formal hypothesis test.
+
+No Yahoo! R3 propensity weighting is reported at this stage. Unlike the Coat
+analysis, the current replication does not assume an oracle or supplied
+inclusion-propensity matrix. Any weighting analysis should first define and
+justify the propensity model and its identifying assumptions.
+
+Yahoo! R3 experiments:
+
+```bash
+python experiments/16_yahoo_r3_support_audit.py
+python experiments/17_yahoo_r3_heldout_benchmark.py
+python experiments/18_yahoo_r3_repeated_holdouts.py
+```
+
+## Next empirical direction
+
+The synthetic, Coat, and Yahoo! R3 phases now provide complementary evidence on
+policy-induced selective observation in offline evaluation. A next empirical
+extension could study a transparently specified Yahoo! R3 propensity model as a
+sensitivity analysis, or add a third dataset with randomized exposure. Either
+extension should define the target population and identifying assumptions
+before applying correction and should not tune candidate models or data choices
+to manufacture reversals.
